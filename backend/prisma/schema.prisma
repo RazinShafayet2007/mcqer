@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  EXAMINER
+  EXAMINEE
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum ExamVisibility {
+  PUBLIC
+  ALL_FRIENDS
+  SELECTED_FRIENDS
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+  COMPLETED
+}
+
+enum OptionLabel {
+  A
+  B
+  C
+  D
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String
+  role           UserRole
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  profile        Profile?
+  createdExams   Exam[]          @relation("ExamCreator")
+  sentRequests   FriendRequest[] @relation("FriendRequestSender")
+  receivedRequests FriendRequest[] @relation("FriendRequestReceiver")
+  assignments    ExamAssignment[]
+  attempts       ExamAttempt[]
+}
+
+model Profile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  name            String
+  username        String   @unique
+  bio             String?
+  headline        String?
+  profileImageUrl String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FriendRequest {
+  id          String              @id @default(cuid())
+  senderId    String
+  receiverId  String
+  status      FriendRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  acceptedAt  DateTime?
+
+  sender      User @relation("FriendRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User @relation("FriendRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@unique([senderId, receiverId])
+}
+
+model Exam {
+  id                   String           @id @default(cuid())
+  title                String
+  description          String?
+  durationMinutes      Int
+  negativeMarkPerWrong Decimal          @db.Decimal(5, 2)
+  createdById          String
+  visibility           ExamVisibility   @default(PUBLIC)
+  isPublished          Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  createdBy            User             @relation("ExamCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  questions            Question[]
+  assignments          ExamAssignment[]
+  attempts             ExamAttempt[]
+  parserImportLogs     ParserImportLog[]
+
+  @@index([createdById])
+  @@index([isPublished])
+}
+
+model Question {
+  id              String      @id @default(cuid())
+  examId          String
+  questionText    String
+  optionA         String
+  optionB         String
+  optionC         String
+  optionD         String
+  correctOption   OptionLabel
+  explanation     String?
+  marksPerQuestion Decimal    @db.Decimal(5, 2) @default(1)
+  orderIndex      Int
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  exam            Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers         ExamAnswer[]
+
+  @@index([examId])
+  @@unique([examId, orderIndex])
+}
+
+model ExamAssignment {
+  id          String   @id @default(cuid())
+  examId      String
+  examineeId  String
+  assignedAt  DateTime @default(now())
+
+  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examinee    User     @relation(fields: [examineeId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, examineeId])
+  @@index([examineeId])
+}
+
+model ExamAttempt {
+  id               String        @id @default(cuid())
+  examId           String
+  examineeId       String
+  startedAt        DateTime
+  endAt            DateTime
+  submittedAt      DateTime?
+  status           AttemptStatus @default(IN_PROGRESS)
+  correctCount     Int           @default(0)
+  wrongCount       Int           @default(0)
+  unansweredCount  Int           @default(0)
+  negativeMarks    Decimal       @db.Decimal(7, 2) @default(0)
+  finalScore       Decimal       @db.Decimal(7, 2) @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  exam             Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examinee         User          @relation(fields: [examineeId], references: [id], onDelete: Cascade)
+  answers          ExamAnswer[]
+
+  @@index([examId])
+  @@index([examineeId])
+  @@index([status])
+}
+
+model ExamAnswer {
+  id             String      @id @default(cuid())
+  attemptId      String
+  questionId     String
+  selectedOption OptionLabel?
+  isCorrect      Boolean?
+  marksAwarded   Decimal     @db.Decimal(7, 2) @default(0)
+  submittedAt    DateTime?   
+
+  attempt        ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question       Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([questionId])
+}
+
+model ParserImportLog {
+  id            String   @id @default(cuid())
+  examId         String
+  rawInputText   String
+  parsedCount    Int
+  failedCount    Int
+  createdAt      DateTime @default(now())
+
+  exam           Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+}

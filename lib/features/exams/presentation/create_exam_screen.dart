@@ -94,25 +94,26 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
               spacing: 12,
               runSpacing: 12,
               children: [
-                ElevatedButton(
-                  onPressed: () => controller.parseQuestions(_rawController.text),
-                  child: const Text('Parse questions'),
-                ),
-                OutlinedButton(
-                  onPressed: drafts.isEmpty
-                      ? null
-                      : () {
-                          controller.createExam(
-                            title: _titleController.text,
-                            description: _descriptionController.text,
-                            durationMinutes: int.tryParse(_durationController.text) ?? 20,
-                            negativeMarkPerWrong: double.tryParse(_negativeController.text) ?? 0.25,
-                            assignedExamineeIds: _resolveRecipients(friendExaminees),
-                          );
-                          context.go('/examiner');
-                        },
-                  child: const Text('Save draft'),
-                ),
+                 ElevatedButton(
+                   onPressed: () => controller.parseQuestions(_rawController.text),
+                   child: const Text('Parse questions'),
+                 ),
+                 OutlinedButton(
+                   onPressed: drafts.isEmpty
+                       ? null
+                       : () async {
+                           await controller.createExam(
+                             title: _titleController.text,
+                             description: _descriptionController.text,
+                             durationMinutes: int.tryParse(_durationController.text) ?? 20,
+                             negativeMarkPerWrong: double.tryParse(_negativeController.text) ?? 0.25,
+                             assignedExamineeIds: _resolveRecipients(friendExaminees),
+                           );
+                           if (!mounted) return;
+                           context.go('/examiner');
+                         },
+                   child: const Text('Save draft'),
+                 ),
               ],
             ),
             const SizedBox(height: 24),

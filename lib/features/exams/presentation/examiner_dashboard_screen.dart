@@ -20,7 +20,7 @@ class ExaminerDashboardScreen extends ConsumerWidget {
     final user = ref.read(appStateProvider.notifier).currentUser;
     final published = exams.where((exam) => exam.isPublished).length;
     final drafts = exams.length - published;
-    final attempts = state.attempts.where((attempt) => attempt.status != AttemptStatus.inProgress).length;
+    final attempts = state.examHistories.values.fold<int>(0, (sum, items) => sum + items.fold<int>(0, (inner, history) => inner + history.attempts.length));
 
     return Scaffold(
       body: AppShell(

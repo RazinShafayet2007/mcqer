@@ -7,17 +7,31 @@ import '../../../core/widgets/app_shell.dart';
 import '../../../core/widgets/exam_widgets.dart';
 import '../../exams/data/app_state.dart';
 
-class ResultScreen extends ConsumerWidget {
+class ResultScreen extends ConsumerStatefulWidget {
   const ResultScreen({super.key, required this.attemptId});
 
   final String attemptId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends ConsumerState<ResultScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(appStateProvider.notifier).loadResult(widget.attemptId));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = ref.watch(appStateProvider).latestResult;
+    if (result == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final controller = ref.read(appStateProvider.notifier);
-    final attempt = controller.attemptById(attemptId);
-    final exam = controller.examById(attempt.examId);
-    final summary = controller.summaryForAttempt(attemptId);
+    final exam = controller.examById(result.attempt.examId);
+    final summary = result.summary;
 
     return Scaffold(
       body: AppShell(
@@ -49,15 +63,16 @@ class ResultScreen extends ConsumerWidget {
                   const SizedBox(height: 10),
                   Text('Negative marks deducted: ${summary.negativeDeduction.toStringAsFixed(2)}'),
                   const SizedBox(height: 8),
-                  Text('Completion status: ${attempt.status.name}'),
+                  Text('Completion status: ${result.attempt.status.name}'),
                   const SizedBox(height: 20),
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
                     children: [
                       ElevatedButton(
-                        onPressed: () {
-                          final newAttempt = controller.startAttempt(exam.id);
+                        onPressed: () async {
+                          final newAttempt = await controller.startAttempt(exam.id);
+                          if (!mounted || newAttempt == null) return;
                           context.go('/attempt/${newAttempt.id}');
                         },
                         child: const Text('Retake exam'),
@@ -77,10 +92,9 @@ class ResultScreen extends ConsumerWidget {
               subtitle: 'Each question shows what the examinee picked and whether it was correct, wrong, or unanswered.',
             ),
             const SizedBox(height: 16),
-            ...exam.questions.asMap().entries.map((entry) {
+            ...result.questions.asMap().entries.map((entry) {
               final question = entry.value;
-              final selectedIndex = attempt.answers[question.id];
-              final status = _resultStatusFor(question.correctIndex, selectedIndex);
+              final status = _resultStatusFor(question.correctIndex, question.selectedIndex);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 14),
@@ -90,20 +104,14 @@ class ResultScreen extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          Expanded(
-                            child: Text(
-                              'Q${entry.key + 1}. ${question.prompt}',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
+                          Expanded(child: Text('Q${entry.key + 1}. ${question.prompt}', style: Theme.of(context).textTheme.titleLarge)),
                           _StatusBadge(status: status),
                         ],
                       ),
                       const SizedBox(height: 12),
                       ...question.options.asMap().entries.map((option) {
-                        final isSelected = selectedIndex == option.key;
+                        final isSelected = question.selectedIndex == option.key;
                         final isCorrect = question.correctIndex == option.key;
-
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Container(
@@ -112,9 +120,7 @@ class ResultScreen extends ConsumerWidget {
                             decoration: BoxDecoration(
                               color: _optionTone(status, isSelected, isCorrect),
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: _optionBorder(status, isSelected, isCorrect),
-                              ),
+                              border: Border.all(color: _optionBorder(status, isSelected, isCorrect)),
                             ),
                             child: Row(
                               children: [
@@ -140,12 +146,8 @@ class ResultScreen extends ConsumerWidget {
   }
 
   _ReviewStatus _resultStatusFor(int correctIndex, int? selectedIndex) {
-    if (selectedIndex == null) {
-      return _ReviewStatus.unanswered;
-    }
-    if (selectedIndex == correctIndex) {
-      return _ReviewStatus.correct;
-    }
+    if (selectedIndex == null) return _ReviewStatus.unanswered;
+    if (selectedIndex == correctIndex) return _ReviewStatus.correct;
     return _ReviewStatus.wrong;
   }
 }
@@ -161,56 +163,33 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: _badgeColor(status),
-        borderRadius: BorderRadius.circular(999),
-      ),
+      decoration: BoxDecoration(color: _badgeColor(status), borderRadius: BorderRadius.circular(999)),
       child: Text(_label(status)),
     );
   }
 
-  String _label(_ReviewStatus status) {
-    switch (status) {
-      case _ReviewStatus.correct:
-        return 'Correct';
-      case _ReviewStatus.wrong:
-        return 'Wrong';
-      case _ReviewStatus.unanswered:
-        return 'Unanswered';
-    }
-  }
+  String _label(_ReviewStatus status) => switch (status) {
+        _ReviewStatus.correct => 'Correct',
+        _ReviewStatus.wrong => 'Wrong',
+        _ReviewStatus.unanswered => 'Unanswered',
+      };
 
-  Color _badgeColor(_ReviewStatus status) {
-    switch (status) {
-      case _ReviewStatus.correct:
-        return AppColors.emerald.withValues(alpha: 0.24);
-      case _ReviewStatus.wrong:
-        return AppColors.coral.withValues(alpha: 0.24);
-      case _ReviewStatus.unanswered:
-        return AppColors.ice.withValues(alpha: 0.2);
-    }
-  }
+  Color _badgeColor(_ReviewStatus status) => switch (status) {
+        _ReviewStatus.correct => AppColors.emerald.withValues(alpha: 0.24),
+        _ReviewStatus.wrong => AppColors.coral.withValues(alpha: 0.24),
+        _ReviewStatus.unanswered => AppColors.ice.withValues(alpha: 0.2),
+      };
 }
 
 Color _optionTone(_ReviewStatus status, bool isSelected, bool isCorrect) {
-  if (isCorrect) {
-    return AppColors.emerald.withValues(alpha: 0.16);
-  }
-  if (isSelected && status == _ReviewStatus.wrong) {
-    return AppColors.coral.withValues(alpha: 0.14);
-  }
+  if (isCorrect) return AppColors.emerald.withValues(alpha: 0.16);
+  if (isSelected && status == _ReviewStatus.wrong) return AppColors.coral.withValues(alpha: 0.14);
   return Colors.white.withValues(alpha: 0.04);
 }
 
 Color _optionBorder(_ReviewStatus status, bool isSelected, bool isCorrect) {
-  if (isCorrect) {
-    return AppColors.emerald.withValues(alpha: 0.55);
-  }
-  if (isSelected && status == _ReviewStatus.wrong) {
-    return AppColors.coral.withValues(alpha: 0.55);
-  }
-  if (isSelected) {
-    return AppColors.gold.withValues(alpha: 0.35);
-  }
+  if (isCorrect) return AppColors.emerald.withValues(alpha: 0.55);
+  if (isSelected && status == _ReviewStatus.wrong) return AppColors.coral.withValues(alpha: 0.55);
+  if (isSelected) return AppColors.gold.withValues(alpha: 0.35);
   return Colors.white.withValues(alpha: 0.08);
 }

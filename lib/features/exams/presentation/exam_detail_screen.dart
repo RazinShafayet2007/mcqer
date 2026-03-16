@@ -8,16 +8,27 @@ import '../../../core/widgets/exam_widgets.dart';
 import '../data/app_state.dart';
 import '../domain/models.dart';
 
-class ExamDetailScreen extends ConsumerWidget {
+class ExamDetailScreen extends ConsumerStatefulWidget {
   const ExamDetailScreen({super.key, required this.examId});
 
   final String examId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ExamDetailScreen> createState() => _ExamDetailScreenState();
+}
+
+class _ExamDetailScreenState extends ConsumerState<ExamDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(appStateProvider.notifier).refreshExamDetail(widget.examId));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(appStateProvider);
     final controller = ref.read(appStateProvider.notifier);
-    final exam = controller.examById(examId);
+    final exam = controller.examById(widget.examId);
     final isExaminer = state.role == UserRole.examiner;
     final latestAttempt = isExaminer ? null : controller.latestCompletedAttemptForExam(exam.id);
     final histories = isExaminer ? controller.attemptHistoryForExam(exam.id) : const <ExamineeAttemptHistory>[];
@@ -28,10 +39,7 @@ class ExamDetailScreen extends ConsumerWidget {
         subtitle: exam.description,
         actions: [
           OutlinedButton(
-            onPressed: () {
-              final nextPath = isExaminer ? '/examiner' : '/examinee';
-              context.go(nextPath);
-            },
+            onPressed: () => context.go(isExaminer ? '/examiner' : '/examinee'),
             child: Text(isExaminer ? 'Back to studio' : 'Back to hall'),
           ),
           if (isExaminer) ...[
@@ -82,21 +90,18 @@ class ExamDetailScreen extends ConsumerWidget {
                     runSpacing: 12,
                     children: [
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           if (isExaminer) {
-                            controller.publishExam(exam.id);
+                            await controller.publishExam(exam.id);
+                            if (!mounted) return;
+                            await controller.refreshExamDetail(exam.id);
                           } else {
-                            final attempt = controller.startAttempt(exam.id);
+                            final attempt = await controller.startAttempt(exam.id);
+                            if (!mounted || attempt == null) return;
                             context.go('/attempt/${attempt.id}');
                           }
                         },
-                        child: Text(
-                          isExaminer
-                              ? (exam.isPublished ? 'Published' : 'Publish exam')
-                              : latestAttempt == null
-                                  ? 'Start exam'
-                                  : 'Retake exam',
-                        ),
+                        child: Text(isExaminer ? (exam.isPublished ? 'Published' : 'Publish exam') : latestAttempt == null ? 'Start exam' : 'Retake exam'),
                       ),
                       if (!isExaminer && latestAttempt != null)
                         OutlinedButton(
@@ -112,126 +117,68 @@ class ExamDetailScreen extends ConsumerWidget {
               const SizedBox(height: 24),
               SectionHeading(
                 title: 'Examinee results',
-                subtitle: histories.isEmpty
-                    ? 'No one has completed this exam yet.'
-                    : 'Track who attempted this exam, how many times they took it, and their latest and best scores.',
+                subtitle: histories.isEmpty ? 'No one has completed this exam yet.' : 'Track who attempted this exam, how many times they took it, and their latest and best scores.',
               ),
               const SizedBox(height: 16),
-              if (histories.isEmpty)
-                const GlassPanel(
-                  child: Text('No completed attempts yet. Publish the exam and let examinees start taking it.'),
-                ),
-              ...histories.map(
-                (history) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: GlassPanel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(history.examineeName, style: Theme.of(context).textTheme.titleLarge),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.gold.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(999),
+              if (histories.isEmpty) const GlassPanel(child: Text('No completed attempts yet. Publish the exam and let examinees start taking it.')),
+              ...histories.map((history) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: GlassPanel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: Text(history.examineeName, style: Theme.of(context).textTheme.titleLarge)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(color: AppColors.gold.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(999)),
+                                child: Text('${history.attempts.length} attempt(s)'),
                               ),
-                              child: Text('${history.attempts.length} attempt(s)'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            _ExaminerStatPill(label: 'Latest score', value: history.latestSummary.finalScore.toStringAsFixed(2)),
-                            _ExaminerStatPill(label: 'Best score', value: history.bestScore.toStringAsFixed(2)),
-                            _ExaminerStatPill(label: 'Correct', value: '${history.latestSummary.correctCount}'),
-                            _ExaminerStatPill(label: 'Wrong', value: '${history.latestSummary.wrongCount}'),
-                            _ExaminerStatPill(label: 'Status', value: history.latestAttempt.status.name),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          'Attempt history',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 10),
-                        ...history.attempts.asMap().entries.map((attemptEntry) {
-                          final attempt = attemptEntry.value;
-                          final summary = controller.summaryForExamAttempt(attempt);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.04),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                              ),
-                              child: Wrap(
-                                spacing: 12,
-                                runSpacing: 8,
-                                children: [
-                                  Text('Attempt ${attemptEntry.key + 1}'),
-                                  Text('Started ${_formatDateTime(attempt.startedAt)}'),
-                                  Text('Score ${summary.finalScore.toStringAsFixed(2)}'),
-                                  Text('Correct ${summary.correctCount}'),
-                                  Text('Wrong ${summary.wrongCount}'),
-                                  Text('Unanswered ${summary.unansweredCount}'),
-                                ],
-                              ),
-                            ),
-                          );
-                        }),
-                      ],
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              _ExaminerStatPill(label: 'Latest score', value: history.latestSummary.finalScore.toStringAsFixed(2)),
+                              _ExaminerStatPill(label: 'Best score', value: history.bestScore.toStringAsFixed(2)),
+                              _ExaminerStatPill(label: 'Correct', value: '${history.latestSummary.correctCount}'),
+                              _ExaminerStatPill(label: 'Wrong', value: '${history.latestSummary.wrongCount}'),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
+                  )),
               const SizedBox(height: 24),
               const SectionHeading(
                 title: 'Question preview',
                 subtitle: 'Only the examiner can inspect prompts, options, and hidden answers before publishing.',
               ),
               const SizedBox(height: 16),
-              ...exam.questions.asMap().entries.map(
-                (entry) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: GlassPanel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Q${entry.key + 1}. ${entry.value.prompt}', style: Theme.of(context).textTheme.titleLarge),
-                        const SizedBox(height: 12),
-                        ...entry.value.options.asMap().entries.map(
-                          (option) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              '${'ABCD'[option.key]}. ${option.value}${option.key == entry.value.correctIndex ? '  (hidden answer)' : ''}',
-                            ),
-                          ),
-                        ),
-                      ],
+              ...exam.questions.asMap().entries.map((entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: GlassPanel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Q${entry.key + 1}. ${entry.value.prompt}', style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 12),
+                          ...entry.value.options.asMap().entries.map((option) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text('${'ABCD'[option.key]}. ${option.value}${option.key == entry.value.correctIndex ? '  (hidden answer)' : ''}'),
+                              )),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
+                  )),
             ],
           ],
         ),
       ),
     );
-  }
-
-  String _formatDateTime(DateTime value) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${value.year}-${two(value.month)}-${two(value.day)} ${two(value.hour)}:${two(value.minute)}';
   }
 }
 
@@ -245,10 +192,7 @@ class _ExaminerStatPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(16)),
       child: Text('$label: $value'),
     );
   }

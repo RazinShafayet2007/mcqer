@@ -16,11 +16,16 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController(text: 'password123');
+  final _usernameController = TextEditingController();
+  bool _registerMode = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
@@ -39,22 +44,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Display name or username'),
-                  ),
+                  if (_registerMode) ...[
+                    TextField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: 'Display name'),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(labelText: 'Username'),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   const SizedBox(height: 14),
                   TextField(
                     controller: _emailController,
                     decoration: const InputDecoration(labelText: 'Email address'),
                   ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: 'Password'),
+                  ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () {
-                      ref.read(appStateProvider.notifier).login(_nameController.text);
+                    onPressed: () async {
+                      final controller = ref.read(appStateProvider.notifier);
+                      final success = _registerMode
+                          ? await controller.register(
+                              email: _emailController.text,
+                              password: _passwordController.text,
+                              name: _nameController.text,
+                              username: _usernameController.text,
+                            )
+                          : await controller.login(_emailController.text, _passwordController.text);
+                      if (!mounted || !success) {
+                        if (mounted) {
+                          final message = ref.read(appStateProvider).errorMessage ?? 'Authentication failed';
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                        }
+                        return;
+                      }
                       context.go('/profile');
                     },
-                    child: const Text('Continue'),
+                    child: Text(_registerMode ? 'Create account' : 'Continue'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => setState(() => _registerMode = !_registerMode),
+                    child: Text(_registerMode ? 'Already have an account? Sign in' : 'Need an account? Register'),
                   ),
                 ],
               ),

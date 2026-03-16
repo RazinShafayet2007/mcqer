@@ -20,9 +20,10 @@ class ProfileAvatar extends StatelessWidget {
     final initials = _initials(user.name);
 
     if (imagePath != null && imagePath.isNotEmpty) {
+      final provider = imagePath.startsWith('http') ? NetworkImage(imagePath) as ImageProvider : FileImage(File(imagePath));
       return CircleAvatar(
         radius: radius,
-        backgroundImage: FileImage(File(imagePath)),
+        backgroundImage: provider,
       );
     }
 

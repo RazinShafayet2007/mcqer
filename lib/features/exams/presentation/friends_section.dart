@@ -42,7 +42,7 @@ class FriendsSection extends ConsumerWidget {
                 title: user.name,
                 subtitle: user.role.name,
                 action: OutlinedButton(
-                  onPressed: pending ? null : () => controller.sendFriendRequest(user.id),
+                  onPressed: pending ? null : () async => controller.sendFriendRequest(user.id),
                   child: Text(pending ? 'Pending' : 'Add friend'),
                 ),
               );
@@ -53,12 +53,15 @@ class FriendsSection extends ConsumerWidget {
             title: incomingTitle,
             emptyText: 'No incoming requests.',
             children: incoming.map((request) {
-              final sender = controller.userById(request.senderId);
+              final sender = request.sender;
+              if (sender == null) {
+                return const SizedBox.shrink();
+              }
               return _FriendTile(
                 title: sender.name,
                 subtitle: 'Wants to connect as ${sender.role.name}',
                 action: ElevatedButton(
-                  onPressed: () => controller.acceptFriendRequest(request.id),
+                  onPressed: () async => controller.acceptFriendRequest(request.id),
                   child: const Text('Accept'),
                 ),
               );

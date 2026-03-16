@@ -50,6 +50,8 @@ class FriendRequest {
     required this.receiverId,
     required this.status,
     required this.createdAt,
+    this.sender,
+    this.receiver,
   });
 
   final String id;
@@ -57,14 +59,18 @@ class FriendRequest {
   final String receiverId;
   final FriendRequestStatus status;
   final DateTime createdAt;
+  final AppUser? sender;
+  final AppUser? receiver;
 
-  FriendRequest copyWith({FriendRequestStatus? status}) {
+  FriendRequest copyWith({FriendRequestStatus? status, AppUser? sender, AppUser? receiver}) {
     return FriendRequest(
       id: id,
       senderId: senderId,
       receiverId: receiverId,
       status: status ?? this.status,
       createdAt: createdAt,
+      sender: sender ?? this.sender,
+      receiver: receiver ?? this.receiver,
     );
   }
 }

@@ -27,7 +27,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final user = ref.read(appStateProvider.notifier).currentUser;
+    final user = ref.read(appStateProvider).currentUser!;
     _nameController = TextEditingController(text: user.name);
     _usernameController = TextEditingController(text: user.username);
     _headlineController = TextEditingController(text: user.headline);
@@ -146,14 +146,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {
-                ref.read(appStateProvider.notifier).updateCurrentUserProfile(
+              onPressed: () async {
+                await ref.read(appStateProvider.notifier).updateCurrentUserProfile(
                       name: _nameController.text,
                       username: _usernameController.text,
                       bio: _bioController.text,
                       profileImagePath: _profileImagePath,
                       headline: _headlineController.text,
                     );
+                if (!mounted) return;
                 context.go(role == UserRole.examiner ? '/examiner' : '/examinee');
               },
               child: const Text('Save profile'),

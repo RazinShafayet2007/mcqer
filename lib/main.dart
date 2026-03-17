@@ -16,7 +16,7 @@ class McqerApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      title: 'MCQer',
+      title: 'Mcqer',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       routerConfig: router,

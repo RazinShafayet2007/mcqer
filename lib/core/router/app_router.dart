@@ -5,6 +5,7 @@ import '../../features/attempts/presentation/attempt_screen.dart';
 import '../../features/attempts/presentation/result_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/role_selection_screen.dart';
+import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/exams/presentation/examinee_dashboard_screen.dart';
 import '../../features/exams/presentation/examiner_dashboard_screen.dart';
 import '../../features/exams/presentation/create_exam_screen.dart';
@@ -17,6 +18,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/roles',
         builder: (context, state) => const RoleSelectionScreen(),
       ),
       GoRoute(

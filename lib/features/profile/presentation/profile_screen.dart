@@ -64,6 +64,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         subtitle: 'Shape how you appear in suggestions, friend requests, and private exam sharing.',
         actions: [
           OutlinedButton(
+            onPressed: () async {
+              await ref.read(appStateProvider.notifier).logout();
+              if (!context.mounted) return;
+              context.go('/roles');
+            },
+            child: const Text('Logout'),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton(
             onPressed: () => context.go(role == UserRole.examiner ? '/examiner' : '/examinee'),
             child: const Text('Back'),
           ),

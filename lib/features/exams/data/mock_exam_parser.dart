@@ -2,8 +2,8 @@ import '../domain/models.dart';
 
 class MockExamParser {
   static final _questionStart = RegExp(r'^\s*\d+[\).]\s*(.+)$');
-  static final _optionLine = RegExp(r'^\s*([A-D])[\).:]\s*(.+)$', caseSensitive: false);
-  static final _answerLine = RegExp(r'^\s*(Answer|Ans|Correct Answer)\s*:\s*([A-D])\s*$', caseSensitive: false);
+  static final _optionLine = RegExp(r'^\s*([A-D])[\).:\-]?\s+(.+)$', caseSensitive: false);
+  static final _answerLine = RegExp(r'^\s*(Answer|Ans|Correct Answer)\s*[:\-]?\s*([A-D])\s*$', caseSensitive: false);
 
   List<ParsedQuestionDraft> parse(String raw) {
     final drafts = <ParsedQuestionDraft>[];
@@ -37,6 +37,11 @@ class MockExamParser {
         currentPrompt = questionMatch.group(1)!.trim();
         options.clear();
         correctIndex = null;
+        continue;
+      }
+
+      if (currentPrompt == null && options.isEmpty) {
+        currentPrompt = line;
         continue;
       }
 

@@ -108,6 +108,19 @@ class ApiClient {
     return _sessionFromJson(data);
   }
 
+  Future<AuthSession> refresh(String refreshToken) async {
+    final data = await _request(
+      'POST',
+      '/auth/refresh',
+      body: {'refreshToken': refreshToken},
+    ) as Map<String, dynamic>;
+    return _sessionFromJson(data);
+  }
+
+  Future<void> logout(String token) async {
+    await _request('POST', '/auth/logout', token: token);
+  }
+
   Future<AppUser> me(String token) async {
     final data = await _request('GET', '/me', token: token) as Map<String, dynamic>;
     return _userFromJson(data);

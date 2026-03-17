@@ -1,13 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../auth/data/session_storage.dart';
 import '../domain/models.dart';
 import 'mock_exam_parser.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
+final sessionStorageProvider = Provider<SessionStorage>((ref) => SessionStorage());
 
 final appStateProvider = StateNotifierProvider<AppController, AppState>((ref) {
-  return AppController(ref.read(apiClientProvider));
+  return AppController(ref.read(apiClientProvider), ref.read(sessionStorageProvider));
 });
 
 class AppState {
@@ -28,6 +30,7 @@ class AppState {
     required this.latestResult,
     required this.examHistories,
     required this.isLoading,
+    required this.isRestoringSession,
     required this.errorMessage,
   });
 
@@ -47,6 +50,7 @@ class AppState {
   final AttemptResultData? latestResult;
   final Map<String, List<ExamineeAttemptHistory>> examHistories;
   final bool isLoading;
+  final bool isRestoringSession;
   final String? errorMessage;
 
   factory AppState.initial() => const AppState(
@@ -66,6 +70,7 @@ class AppState {
         latestResult: null,
         examHistories: {},
         isLoading: false,
+        isRestoringSession: true,
         errorMessage: null,
       );
 
@@ -86,6 +91,7 @@ class AppState {
     AttemptResultData? latestResult,
     Map<String, List<ExamineeAttemptHistory>>? examHistories,
     bool? isLoading,
+    bool? isRestoringSession,
     String? errorMessage,
     bool clearSession = false,
     bool clearError = false,
@@ -108,15 +114,17 @@ class AppState {
       latestResult: clearResult ? null : (latestResult ?? this.latestResult),
       examHistories: examHistories ?? this.examHistories,
       isLoading: isLoading ?? this.isLoading,
+      isRestoringSession: isRestoringSession ?? this.isRestoringSession,
       errorMessage: clearError ? null : errorMessage,
     );
   }
 }
 
 class AppController extends StateNotifier<AppState> {
-  AppController(this._api) : super(AppState.initial());
+  AppController(this._api, this._sessionStorage) : super(AppState.initial());
 
   final ApiClient _api;
+  final SessionStorage _sessionStorage;
   final _parser = MockExamParser();
 
   void chooseRole(UserRole role) {
@@ -130,6 +138,11 @@ class AppController extends StateNotifier<AppState> {
   Future<bool> login(String email, String password) async {
     final result = await _run(() async {
       final session = await _api.login(email: email, password: password);
+      await _sessionStorage.saveSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        role: session.user.role,
+      );
       state = state.copyWith(
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,
@@ -159,6 +172,11 @@ class AppController extends StateNotifier<AppState> {
         name: name,
         username: username,
       );
+      await _sessionStorage.saveSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        role: session.user.role,
+      );
       state = state.copyWith(
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,
@@ -172,8 +190,66 @@ class AppController extends StateNotifier<AppState> {
     return result ?? false;
   }
 
-  void logout() {
-    state = AppState.initial();
+  Future<void> logout() async {
+    final token = state.accessToken;
+    if (token != null) {
+      try {
+        await _api.logout(token);
+      } catch (_) {}
+    }
+    await _sessionStorage.clear();
+    state = AppState.initial().copyWith(isRestoringSession: false);
+  }
+
+  Future<bool> restoreSession() async {
+    final stored = await _sessionStorage.readSession();
+    if (stored == null) {
+      state = state.copyWith(isRestoringSession: false);
+      return false;
+    }
+
+    try {
+      state = state.copyWith(
+        accessToken: stored.accessToken,
+        refreshToken: stored.refreshToken,
+        role: stored.role,
+        entryRole: stored.role,
+      );
+      final me = await _api.me(stored.accessToken);
+      state = state.copyWith(
+        currentUser: me,
+        displayName: me.name,
+        role: me.role,
+        entryRole: me.role,
+      );
+      await loadDashboardData();
+      state = state.copyWith(isRestoringSession: false);
+      return true;
+    } catch (_) {
+      try {
+        final refreshed = await _api.refresh(stored.refreshToken);
+        await _sessionStorage.saveSession(
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken,
+          role: refreshed.user.role,
+        );
+        state = state.copyWith(
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken,
+          currentUser: refreshed.user,
+          displayName: refreshed.user.name,
+          role: refreshed.user.role,
+          entryRole: refreshed.user.role,
+        );
+        await loadDashboardData();
+        state = state.copyWith(isRestoringSession: false);
+        return true;
+      } catch (_) {
+        await _sessionStorage.clear();
+        state = AppState.initial().copyWith(isRestoringSession: false);
+        return false;
+      }
+    }
   }
 
   void parseQuestions(String raw) {

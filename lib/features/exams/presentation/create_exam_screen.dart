@@ -95,7 +95,12 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
               runSpacing: 12,
               children: [
                  ElevatedButton(
-                   onPressed: () => controller.parseQuestions(_rawController.text),
+                   onPressed: () {
+                     controller.parseQuestions(_rawController.text);
+                     final count = ref.read(appStateProvider).parserDrafts.length;
+                     final message = count == 0 ? 'No questions were detected. Check numbering, options, or answer lines.' : 'Parsed $count question(s).';
+                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                   },
                    child: const Text('Parse questions'),
                  ),
                  OutlinedButton(

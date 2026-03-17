@@ -28,6 +28,15 @@ class ExaminerDashboardScreen extends ConsumerWidget {
         subtitle: 'Shape question banks, preview parser output, and control publishing from one premium console.',
         actions: [
           OutlinedButton(
+            onPressed: () async {
+              await ref.read(appStateProvider.notifier).logout();
+              if (!context.mounted) return;
+              context.go('/roles');
+            },
+            child: const Text('Logout'),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton(
             onPressed: () => context.go('/profile'),
             child: const Text('Profile'),
           ),

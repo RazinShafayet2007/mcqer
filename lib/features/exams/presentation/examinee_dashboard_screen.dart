@@ -28,6 +28,15 @@ class ExamineeDashboardScreen extends ConsumerWidget {
         actions: showExaminerToggle
             ? [
                 OutlinedButton(
+                  onPressed: () async {
+                    await ref.read(appStateProvider.notifier).logout();
+                    if (!context.mounted) return;
+                    context.go('/roles');
+                  },
+                  child: const Text('Logout'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
                   onPressed: () => context.go('/profile'),
                   child: const Text('Profile'),
                 ),
@@ -41,6 +50,15 @@ class ExamineeDashboardScreen extends ConsumerWidget {
                 ),
               ]
             : [
+                OutlinedButton(
+                  onPressed: () async {
+                    await ref.read(appStateProvider.notifier).logout();
+                    if (!context.mounted) return;
+                    context.go('/roles');
+                  },
+                  child: const Text('Logout'),
+                ),
+                const SizedBox(width: 12),
                 OutlinedButton(
                   onPressed: () => context.go('/profile'),
                   child: const Text('Profile'),

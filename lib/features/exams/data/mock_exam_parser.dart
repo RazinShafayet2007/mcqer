@@ -1,9 +1,23 @@
 import '../domain/models.dart';
 
 class MockExamParser {
-  static final _questionStart = RegExp(r'^\s*\d+[\).]\s*(.+)$');
-  static final _optionLine = RegExp(r'^\s*([A-D])[\).:\-]?\s+(.+)$', caseSensitive: false);
-  static final _answerLine = RegExp(r'^\s*(Answer|Ans|Correct Answer)\s*[:\-]?\s*([A-D])\s*$', caseSensitive: false);
+  static final _questionStart = RegExp(r'^\s*([0-9০-৯]+)[\).]\s*(.+)$');
+  static final _optionLine = RegExp(r'^\s*([A-Dক-ঘ])[\).:\-]?\s+(.+)$', caseSensitive: false);
+  static final _answerLine = RegExp(
+    r'^\s*(Answer|Ans|Correct Answer|উত্তর|সঠিক উত্তর)\s*[:\-]?\s*([A-Dক-ঘ])\s*$',
+    caseSensitive: false,
+  );
+  static const _optionLabels = ['A', 'B', 'C', 'D', 'ক', 'খ', 'গ', 'ঘ'];
+  static const _normalizedOptionMap = {
+    'A': 0,
+    'B': 1,
+    'C': 2,
+    'D': 3,
+    'ক': 0,
+    'খ': 1,
+    'গ': 2,
+    'ঘ': 3,
+  };
 
   List<ParsedQuestionDraft> parse(String raw) {
     final drafts = <ParsedQuestionDraft>[];
@@ -34,7 +48,7 @@ class MockExamParser {
       final questionMatch = _questionStart.firstMatch(line);
       if (questionMatch != null) {
         flush();
-        currentPrompt = questionMatch.group(1)!.trim();
+        currentPrompt = questionMatch.group(2)!.trim();
         options.clear();
         correctIndex = null;
         continue;
@@ -47,14 +61,19 @@ class MockExamParser {
 
       final optionMatch = _optionLine.firstMatch(line);
       if (optionMatch != null) {
+        final label = optionMatch.group(1)!.trim().toUpperCase();
+        if (!_optionLabels.contains(label) && !_optionLabels.contains(optionMatch.group(1)!.trim())) {
+          continue;
+        }
         options.add(optionMatch.group(2)!.trim());
         continue;
       }
 
       final answerMatch = _answerLine.firstMatch(line);
       if (answerMatch != null) {
-        final answer = answerMatch.group(2)!.toUpperCase();
-        correctIndex = 'ABCD'.indexOf(answer);
+        final rawAnswer = answerMatch.group(2)!.trim();
+        final answer = rawAnswer.toUpperCase();
+        correctIndex = _normalizedOptionMap[answer] ?? _normalizedOptionMap[rawAnswer];
       }
     }
 

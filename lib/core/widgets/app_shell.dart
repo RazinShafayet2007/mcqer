@@ -30,31 +30,49 @@ class AppShell extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final horizontal = constraints.maxWidth > 900 ? 56.0 : 20.0;
+            final compact = constraints.maxWidth < 700;
             return SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 28),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (title != null || actions != null) ...[
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (title != null)
-                                Text(title!, style: Theme.of(context).textTheme.displayMedium),
-                              if (subtitle != null) ...[
-                                const SizedBox(height: 10),
-                                Text(subtitle!, style: Theme.of(context).textTheme.bodyLarge),
+                    if (compact)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (title != null)
+                            Text(title!, style: Theme.of(context).textTheme.displayMedium),
+                          if (actions != null) ...[
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: actions!,
+                            ),
+                          ],
+                        ],
+                      )
+                    else
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (title != null)
+                                  Text(title!, style: Theme.of(context).textTheme.displayMedium),
+                                if (subtitle != null) ...[
+                                  const SizedBox(height: 10),
+                                  Text(subtitle!, style: Theme.of(context).textTheme.bodyLarge),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
-                        if (actions != null) ...actions!,
-                      ],
-                    ),
+                          if (actions != null) ...actions!,
+                        ],
+                      ),
                     const SizedBox(height: 24),
                   ],
                   child,
